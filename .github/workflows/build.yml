@@ -28,7 +28,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential git zip unzip \
+            build-essential git zip unzip wget \
             autoconf automake libtool pkg-config \
             zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 \
             cmake libffi-dev libssl-dev \
@@ -40,13 +40,63 @@ jobs:
           pip install --upgrade pip
           pip install cython==0.29.33 buildozer==1.5.0
       
+      - name: Install Android SDK in Buildozer's exact location
+        run: |
+          echo "=== Устанавливаем Android SDK туда, где его ищет Buildozer ==="
+          
+          # ТОЧНЫЙ путь, который ищет Buildozer
+          SDK_DIR=$HOME/.buildozer/android/platform/android-sdk
+          mkdir -p $SDK_DIR
+          
+          # Скачиваем command-line tools
+          cd /tmp
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
+          unzip -q cmdline-tools.zip
+          
+          # Устанавливаем в новое место (cmdline-tools/latest)
+          mkdir -p $SDK_DIR/cmdline-tools/latest
+          cp -r cmdline-tools/* $SDK_DIR/cmdline-tools/latest/
+          
+          # Создаём симлинк в СТАРОЕ место (tools/bin), которое ищет Buildozer
+          mkdir -p $SDK_DIR/tools/bin
+          ln -sf $SDK_DIR/cmdline-tools/latest/bin/sdkmanager $SDK_DIR/tools/bin/sdkmanager
+          ln -sf $SDK_DIR/cmdline-tools/latest/bin/avdmanager $SDK_DIR/tools/bin/avdmanager
+          
+          # Принимаем лицензии
+          echo "=== Принимаем лицензии ==="
+          yes | $SDK_DIR/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          
+          # Устанавливаем build-tools, platform-tools, platforms
+          echo "=== Устанавливаем build-tools ==="
+          $SDK_DIR/cmdline-tools/latest/bin/sdkmanager \
+            "platform-tools" \
+            "build-tools;33.0.0" \
+            "platforms;android-33"
+          
+          # Проверяем, что aidl на месте
+          echo "=== Проверяем установку ==="
+          ls -la $SDK_DIR/build-tools/
+          ls -la $SDK_DIR/build-tools/33.0.0/aidl || echo "aidl не найден!"
+          ls -la $SDK_DIR/platform-tools/
+          
+          # Сохраняем переменные для следующих шагов
+          echo "ANDROID_HOME=$SDK_DIR" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$SDK_DIR" >> $GITHUB_ENV
+          echo "PATH=$SDK_DIR/platform-tools:$SDK_DIR/build-tools/33.0.0:$PATH" >> $GITHUB_ENV
+      
       - name: Build APK with Buildozer
+        env:
+          ANDROID_HOME: ${{ github.workspace }}/../.buildozer/android/platform/android-sdk
+          ANDROID_SDK_ROOT: ${{ github.workspace }}/../.buildozer/android/platform/android-sdk
         run: |
           echo "=== Версии ==="
           python3 --version
           java -version
           buildozer --version
-          echo "=== Начинаем сборку (Buildozer сам скачает Android SDK) ==="
+          echo "=== ANDROID_HOME = $ANDROID_HOME ==="
+          echo "=== Проверяем build-tools ==="
+          ls -la $ANDROID_HOME/build-tools/ || echo "build-tools не найдены!"
+          echo "=== Начинаем сборку ==="
           buildozer -v android debug
       
       - name: Upload APK artifact
