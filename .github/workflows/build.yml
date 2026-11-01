@@ -40,39 +40,45 @@ jobs:
           pip install --upgrade pip
           pip install cython==0.29.33 buildozer==1.5.0
       
-      - name: Install Android SDK and Build-Tools
+      - name: Install Android SDK in Buildozer's expected location
         run: |
-          echo "=== Установка Android SDK ==="
-          export ANDROID_HOME=$HOME/android-sdk
+          # УСТАНАВЛИВАЕМ SDK ИМЕННО ТАМ, ГДЕ ЕГО ИЩЕТ BUILDOZER
+          export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
           mkdir -p $ANDROID_HOME
           
-          # Скачиваем Android command-line tools
+          echo "=== Скачиваем Android command-line tools ==="
           cd /tmp
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
           unzip -q cmdline-tools.zip
           mkdir -p $ANDROID_HOME/cmdline-tools/latest
           mv cmdline-tools/* $ANDROID_HOME/cmdline-tools/latest/
           
-          # Добавляем в PATH
-          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          echo "=== Принимаем лицензии ==="
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           
-          # Принимаем лицензии
-          yes | sdkmanager --licenses || true
+          echo "=== Устанавливаем build-tools и platform-tools ==="
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platform-tools" \
+            "build-tools;33.0.0" \
+            "platforms;android-33"
           
-          # Устанавливаем build-tools и platform-tools
-          sdkmanager "platform-tools" "build-tools;33.0.2" "platforms;android-33"
-          
-          echo "=== Android SDK установлен ==="
+          echo "=== Проверяем установку ==="
           ls -la $ANDROID_HOME/build-tools/
+          ls -la $ANDROID_HOME/platform-tools/
+          
+          # Сохраняем путь для следующего шага
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
       
       - name: Build APK with Buildozer
         env:
-          ANDROID_HOME: ${{ runner.workspace }}/android-sdk
+          ANDROID_HOME: ${{ github.workspace }}/../.buildozer/android/platform/android-sdk
         run: |
           echo "=== Версии ==="
           python3 --version
           java -version
           buildozer --version
+          echo "=== ANDROID_HOME = $ANDROID_HOME ==="
+          ls -la $ANDROID_HOME/build-tools/ || echo "build-tools не найдены!"
           echo "=== Начинаем сборку ==="
           buildozer -v android debug
       
