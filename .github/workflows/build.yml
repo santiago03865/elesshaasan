@@ -28,7 +28,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential git zip unzip \
+            build-essential git zip unzip wget \
             autoconf automake libtool pkg-config \
             zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 \
             cmake libffi-dev libssl-dev \
@@ -40,7 +40,34 @@ jobs:
           pip install --upgrade pip
           pip install cython==0.29.33 buildozer==1.5.0
       
+      - name: Install Android SDK and Build-Tools
+        run: |
+          echo "=== Установка Android SDK ==="
+          export ANDROID_HOME=$HOME/android-sdk
+          mkdir -p $ANDROID_HOME
+          
+          # Скачиваем Android command-line tools
+          cd /tmp
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
+          unzip -q cmdline-tools.zip
+          mkdir -p $ANDROID_HOME/cmdline-tools/latest
+          mv cmdline-tools/* $ANDROID_HOME/cmdline-tools/latest/
+          
+          # Добавляем в PATH
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          
+          # Принимаем лицензии
+          yes | sdkmanager --licenses || true
+          
+          # Устанавливаем build-tools и platform-tools
+          sdkmanager "platform-tools" "build-tools;33.0.2" "platforms;android-33"
+          
+          echo "=== Android SDK установлен ==="
+          ls -la $ANDROID_HOME/build-tools/
+      
       - name: Build APK with Buildozer
+        env:
+          ANDROID_HOME: ${{ runner.workspace }}/android-sdk
         run: |
           echo "=== Версии ==="
           python3 --version
