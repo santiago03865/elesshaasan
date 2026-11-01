@@ -27,7 +27,8 @@ from kivy.utils import get_color_from_hex
 # =============================================================================
 # ★★★ РАЗМЕР ОКНА ПРИЛОЖЕНИЯ ★★★
 # =============================================================================
-Window.size = (400, 780)
+from kivy.core.window import Window
+Window.bind(on_resize=lambda *args:None)
 Window.clearcolor = get_color_from_hex("#3A3C3C")  
 
 # =============================================================================
